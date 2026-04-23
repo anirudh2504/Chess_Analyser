@@ -142,7 +142,7 @@ textarea::placeholder {
 
 .check-item__features {
   display: flex;
-  gap: 16px;
+  gap: 9px;
   flex-wrap: wrap;
 }
 
