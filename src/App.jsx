@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
 import AnalyzerBoard from './components/AnalyzerBoard';
 import LandingPage from './components/LandingPage';
-import { useGameAnalysis } from './hooks/useGameAnalysis';
-import { useStockfish } from './hooks/useStockfish';
+import { useGameReview } from './hooks/useGameReview';
 
 export default function App() {
-  const { ready: engineReady, engineError, analyzeFen } = useStockfish();
-  const analysis = useGameAnalysis(analyzeFen);
+  const analysis = useGameReview();
   const [games, setGames] = useState([]);
   const [selectedGameId, setSelectedGameId] = useState(null);
   const [theme, setTheme] = useState('dark');
@@ -39,23 +37,7 @@ export default function App() {
   }
 
   if (analysis.gameData) {
-    return (
-      <AnalyzerBoard
-        boardFen={analysis.boardFen}
-        gameData={analysis.gameData}
-        metadata={analysis.metadata}
-        currentNode={analysis.currentNode}
-        currentMove={analysis.currentMove}
-        analysisByMove={analysis.analysisByMove}
-        engineReady={engineReady}
-        engineError={engineError || analysis.error}
-        status={analysis.status}
-        onNavigate={analysis.navigateTo}
-        onPrevious={analysis.previousMove}
-        onNext={analysis.nextMove}
-        onReset={reset}
-      />
-    );
+    return <AnalyzerBoard review={analysis} onReset={reset} />;
   }
 
   return (

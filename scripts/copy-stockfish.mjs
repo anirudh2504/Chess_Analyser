@@ -3,10 +3,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(fileURLToPath(new URL('../package.json', import.meta.url)));
-const sourceDir = join(root, 'node_modules', 'stockfish', 'src');
+const sourceDir = join(root, 'node_modules', 'stockfish', 'bin');
 const publicDir = join(root, 'public', 'stockfish');
 
-const assets = ['stockfish-nnue-16-single.js', 'stockfish-nnue-16-single.wasm'];
+// Stockfish 18 "lite" single-threaded build: small (~7MB), NNUE built in, and needs no
+// cross-origin-isolation headers, so several copies can run side by side in Web Workers.
+const assets = ['stockfish-18-lite-single.js', 'stockfish-18-lite-single.wasm'];
 
 mkdirSync(publicDir, { recursive: true });
 
