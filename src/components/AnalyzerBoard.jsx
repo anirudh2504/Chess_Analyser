@@ -13,12 +13,35 @@ import MoveList from './review/MoveList';
 import ReviewSummary from './review/ReviewSummary';
 
 const BEST_ARROW = 'rgba(129, 182, 76, 0.85)';
-const THREAT_ARROW = 'rgba(250, 65, 45, 0.75)';
 const ENGINE_ARROW = 'rgba(114, 217, 255, 0.85)';
+const DARK_SQUARE = '#0b3a52';
+const LIGHT_SQUARE = '#d9f5ff';
+const LINE_COLOR = '#72d9ff';
+const NEUTRAL_COLOR = '#94a3b8';
 
-function tint(hex, alpha) {
+function hexToRgb(hex) {
   const value = parseInt(hex.slice(1), 16);
-  return `rgba(${value >> 16}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
+  return [value >> 16, (value >> 8) & 255, value & 255];
+}
+
+function isDarkSquare(square) {
+  return (square.charCodeAt(0) - 97 + Number(square[1])) % 2 === 1;
+}
+
+/**
+ * Solid highlight: the highlight colour blended into the square's own colour. Translucent overlays
+ * turn muddy brown on the dark squares; blending keeps the colour clean on both.
+ */
+function highlight(square, hex, strength) {
+  const base = hexToRgb(isDarkSquare(square) ? DARK_SQUARE : LIGHT_SQUARE);
+  const color = hexToRgb(hex);
+  const amount = isDarkSquare(square) ? Math.min(1, strength + 0.15) : strength;
+  const mixed = base.map((channel, index) => Math.round(channel + (color[index] - channel) * amount));
+  return { background: `rgb(${mixed.join(', ')})` };
+}
+
+function moveHighlight(from, to, hex) {
+  return { [from]: highlight(from, hex, 0.45), [to]: highlight(to, hex, 0.65) };
 }
 
 function squarePosition(square, orientation, size) {
@@ -33,23 +56,29 @@ function uciArrow(uci, color) {
   return uci && uci.length >= 4 ? [uci.slice(0, 2), uci.slice(2, 4), color] : null;
 }
 
-/** Highlights, arrows and the classification badge for whatever is on the board right now. */
+/**
+ * Highlights, arrows and the classification badge for whatever is on the board right now.
+ * Like chess.com, at most one arrow is drawn (the best move); the opponent's threat is only shown
+ * on request ("Show threat"), so arrows never pile on top of each other.
+ */
 function boardDecorations({ review, node, line, retry, currentPosition, isMine }) {
   if (retry) {
     if (!retry.attempt) return { squares: {}, arrows: [], badge: null };
-    const color = retry.status === 'correct' ? CLASSIFICATIONS.best.color : CLASSIFICATIONS.mistake.color;
+    const correct = retry.status === 'correct';
+    const color = correct ? CLASSIFICATIONS.best.color : CLASSIFICATIONS.mistake.color;
     return {
-      squares: { [retry.attempt.from]: { background: tint(color, 0.45) }, [retry.attempt.to]: { background: tint(color, 0.6) } },
+      squares: moveHighlight(retry.attempt.from, retry.attempt.to, color),
       arrows: [],
-      badge: { square: retry.attempt.to, classification: retry.status === 'correct' ? 'best' : 'mistake' },
+      badge: { square: retry.attempt.to, classification: correct ? 'best' : 'mistake' },
     };
   }
 
   if (line) {
     const step = line.index >= 0 ? line.moves[line.index] : null;
-    const squares = step ? { [step.from]: { background: 'rgba(114, 217, 255, 0.35)' }, [step.to]: { background: 'rgba(114, 217, 255, 0.5)' } } : {};
-    const engineBest = currentPosition?.bestMove;
-    const arrow = line.kind === 'explore' ? uciArrow(engineBest, ENGINE_ARROW) : null;
+    const next = line.moves[line.index + 1];
+    const squares = step ? moveHighlight(step.from, step.to, LINE_COLOR) : {};
+    // Point at the next move of the line (or the engine's choice while exploring).
+    const arrow = line.kind === 'explore' ? uciArrow(currentPosition?.bestMove, ENGINE_ARROW) : uciArrow(next?.uci, ENGINE_ARROW);
     return { squares, arrows: arrow ? [arrow] : [], badge: null };
   }
 
@@ -58,25 +87,20 @@ function boardDecorations({ review, node, line, retry, currentPosition, isMine }
   // Opponent's move: no grading, just a neutral highlight and an arrow for the user's best reply.
   if (!isMine) {
     const reply = uciArrow(review?.threatLine.moves[0]?.uci, BEST_ARROW);
-    return {
-      squares: { [node.from]: { background: 'rgba(148, 163, 184, 0.35)' }, [node.to]: { background: 'rgba(148, 163, 184, 0.5)' } },
-      arrows: reply ? [reply] : [],
-      badge: null,
-    };
+    return { squares: moveHighlight(node.from, node.to, NEUTRAL_COLOR), arrows: reply ? [reply] : [], badge: null };
   }
 
-  const color = review ? CLASSIFICATIONS[review.classification].color : '#72d9ff';
-  const squares = { [node.from]: { background: tint(color, 0.4) }, [node.to]: { background: tint(color, 0.55) } };
+  const color = review ? CLASSIFICATIONS[review.classification].color : LINE_COLOR;
   const arrows = [];
   if (review && !review.isBestMove && !['best', 'book', 'forced'].includes(review.classification)) {
     const best = uciArrow(review.bestMove, BEST_ARROW);
     if (best) arrows.push(best);
-    if (['mistake', 'blunder', 'miss'].includes(review.classification)) {
-      const threat = uciArrow(review.threatLine.moves[0]?.uci, THREAT_ARROW);
-      if (threat) arrows.push(threat);
-    }
   }
-  return { squares, arrows, badge: review ? { square: node.to, classification: review.classification } : null };
+  return {
+    squares: moveHighlight(node.from, node.to, color),
+    arrows,
+    badge: review ? { square: node.to, classification: review.classification } : null,
+  };
 }
 
 const PANEL_WIDTH = 416; // right-hand panel, like chess.com's review sidebar
