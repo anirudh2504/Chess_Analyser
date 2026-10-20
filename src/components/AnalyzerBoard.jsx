@@ -34,7 +34,7 @@ function uciArrow(uci, color) {
 }
 
 /** Highlights, arrows and the classification badge for whatever is on the board right now. */
-function boardDecorations({ review, node, line, retry, currentPosition }) {
+function boardDecorations({ review, node, line, retry, currentPosition, isMine }) {
   if (retry) {
     if (!retry.attempt) return { squares: {}, arrows: [], badge: null };
     const color = retry.status === 'correct' ? CLASSIFICATIONS.best.color : CLASSIFICATIONS.mistake.color;
@@ -54,10 +54,21 @@ function boardDecorations({ review, node, line, retry, currentPosition }) {
   }
 
   if (!node) return { squares: {}, arrows: [], badge: null };
+
+  // Opponent's move: no grading, just a neutral highlight and an arrow for the user's best reply.
+  if (!isMine) {
+    const reply = uciArrow(review?.threatLine.moves[0]?.uci, BEST_ARROW);
+    return {
+      squares: { [node.from]: { background: 'rgba(148, 163, 184, 0.35)' }, [node.to]: { background: 'rgba(148, 163, 184, 0.5)' } },
+      arrows: reply ? [reply] : [],
+      badge: null,
+    };
+  }
+
   const color = review ? CLASSIFICATIONS[review.classification].color : '#72d9ff';
   const squares = { [node.from]: { background: tint(color, 0.4) }, [node.to]: { background: tint(color, 0.55) } };
   const arrows = [];
-  if (review && !review.isBestMove && !['book', 'forced'].includes(review.classification)) {
+  if (review && !review.isBestMove && !['best', 'book', 'forced'].includes(review.classification)) {
     const best = uciArrow(review.bestMove, BEST_ARROW);
     if (best) arrows.push(best);
     if (['mistake', 'blunder', 'miss'].includes(review.classification)) {
@@ -110,6 +121,10 @@ export default function AnalyzerBoard({ review: state, onReset }) {
     analysisComplete,
     depthPreset,
     setDepthPreset,
+    reviewAs,
+    setReviewAs,
+    myReviews,
+    currentIsMine,
     currentMove,
     currentReview,
     currentPosition,
@@ -131,7 +146,7 @@ export default function AnalyzerBoard({ review: state, onReset }) {
   } = state;
 
   const [layout, setLayout] = useState(computeLayout);
-  const [orientation, setOrientation] = useState('white');
+  const [orientation, setOrientation] = useState(metadata?.perspective === 'b' ? 'black' : 'white');
   const [selectedSquare, setSelectedSquare] = useState(null);
   const timeline = gameData.timeline;
   const node = currentMove >= 0 ? timeline[currentMove] : null;
@@ -157,7 +172,7 @@ export default function AnalyzerBoard({ review: state, onReset }) {
   }, [exitSideLine, next, previous]);
 
   const evaluation = line || retry ? currentPosition?.eval : positions[currentMove + 1]?.eval;
-  const decorations = boardDecorations({ review: currentReview, node, line, retry, currentPosition });
+  const decorations = boardDecorations({ review: currentReview, node, line, retry, currentPosition, isMine: currentIsMine });
   const squareSize = boardWidth / 8;
   const badgePosition = decorations.badge ? squarePosition(decorations.badge.square, orientation, squareSize) : null;
   const retryLocked = retry && retry.status !== 'waiting';
@@ -208,6 +223,28 @@ export default function AnalyzerBoard({ review: state, onReset }) {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <div className="flex items-center gap-1 rounded border border-sky-300/15 p-1 text-xs" role="group" aria-label="Which side did you play?">
+            <span className="hidden px-1 text-sky-100/70 md:inline">You played</span>
+            {[
+              ['w', 'White'],
+              ['b', 'Black'],
+            ].map(([side, label]) => (
+              <button
+                key={side}
+                type="button"
+                onClick={() => {
+                  setReviewAs(side);
+                  setOrientation(side === 'w' ? 'white' : 'black');
+                }}
+                aria-pressed={reviewAs === side}
+                className={`rounded px-2 py-1 font-bold transition ${
+                  reviewAs === side ? 'bg-cyanGlow text-slate-950' : 'text-sky-100/70 hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <label className="flex items-center gap-2 rounded border border-sky-300/15 px-2 py-1.5 text-xs text-sky-100/70">
             <span className="hidden sm:inline">Depth</span>
             <select
@@ -278,12 +315,15 @@ export default function AnalyzerBoard({ review: state, onReset }) {
           className="glass flex w-full flex-col gap-3 rounded-lg p-3 lg:w-[26rem] lg:shrink-0"
           style={{ height: panelHeight }}
         >
-          <ReviewSummary summary={summary} metadata={metadata} progress={progress} analysisComplete={analysisComplete} />
-          <EvalGraph positions={positions} reviews={reviews} currentMove={currentMove} totalPositions={timeline.length + 1} onNavigate={navigateTo} />
+          <ReviewSummary summary={summary} metadata={metadata} reviewAs={reviewAs} progress={progress} analysisComplete={analysisComplete} />
+          <EvalGraph positions={positions} reviews={myReviews} currentMove={currentMove} totalPositions={timeline.length + 1} onNavigate={navigateTo} />
           <div className="scrollbar-thin max-h-[45%] shrink-0 overflow-y-auto">
             <CoachPanel
               node={node}
               review={currentReview}
+              isMine={currentIsMine}
+              reviewAs={reviewAs}
+              opponentName={reviewAs === 'w' ? metadata?.black : metadata?.white}
               currentPosition={currentPosition}
               line={line}
               retry={retry}
@@ -298,6 +338,7 @@ export default function AnalyzerBoard({ review: state, onReset }) {
           <MoveList
             timeline={timeline}
             reviews={reviews}
+            reviewAs={reviewAs}
             currentMove={currentMove}
             onNavigate={navigateTo}
             className={layout.wide ? 'min-h-[6rem] flex-1' : 'max-h-72'}

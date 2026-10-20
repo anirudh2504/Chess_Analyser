@@ -26,11 +26,11 @@ function terminalAnalysis(fen) {
 const positionCache = new Map();
 const STORAGE_PREFIX = 'chess-analyser:review:v1:';
 
-function gameKey(fens, depth) {
+function gameKey(fens, depth, side) {
   let hash = 5381;
   const text = fens.join('|');
   for (let index = 0; index < text.length; index += 1) hash = ((hash << 5) + hash + text.charCodeAt(index)) | 0;
-  return `${STORAGE_PREFIX}${depth}:${fens.length}:${(hash >>> 0).toString(36)}`;
+  return `${STORAGE_PREFIX}${depth}:${side}:${fens.length}:${(hash >>> 0).toString(36)}`;
 }
 
 function loadSavedReview(key) {
@@ -63,6 +63,9 @@ async function analyzePosition(pool, fen, options) {
   if (terminal) return terminal;
   const cacheKey = `${options.depth}:${options.multiPv}:${fen}`;
   if (positionCache.has(cacheKey)) return positionCache.get(cacheKey);
+  // A cached 2-line analysis also answers a 1-line request.
+  const richer = positionCache.get(`${options.depth}:2:${fen}`);
+  if (options.multiPv === 1 && richer) return richer;
   const turn = fen.split(' ')[1];
   const result = await pool.analyze(fen, options);
   const lines = result.lines.map((line) => ({ eval: fromEngineScore(line.score, turn), pv: line.pv, depth: line.depth }));
@@ -81,6 +84,8 @@ export function useGameReview() {
   const [positions, setPositions] = useState([]);
   const [book, setBook] = useState(null);
   const [depthPreset, setDepthPreset] = useState('standard');
+  // The side the user played: only these moves are rated and explained.
+  const [reviewAs, setReviewAs] = useState('w');
   const [currentMove, setCurrentMove] = useState(-1);
   const [error, setError] = useState('');
 
@@ -112,7 +117,7 @@ export function useGameReview() {
     if (!pool || !fens.length) return undefined;
     let cancelled = false;
     const depth = DEPTH_PRESETS[depthPreset];
-    const key = gameKey(fens, depth);
+    const key = gameKey(fens, depth, reviewAs);
     reviewCacheRef.current = [];
 
     const saved = loadSavedReview(key);
@@ -125,7 +130,9 @@ export function useGameReview() {
     const results = [];
     let remaining = fens.length;
     fens.forEach((fen, index) => {
-      analyzePosition(pool, fen, { depth, multiPv: 2 })
+      // A second engine line is only needed to rate the user's own moves ("Great" = only good move).
+      const multiPv = fen.split(' ')[1] === reviewAs ? 2 : 1;
+      analyzePosition(pool, fen, { depth, multiPv })
         .then((analysis) => {
           if (cancelled) return;
           results[index] = analysis;
@@ -146,7 +153,7 @@ export function useGameReview() {
       cancelled = true;
       pool.cancelAll();
     };
-  }, [fens, depthPreset]);
+  }, [fens, depthPreset, reviewAs]);
 
   const analyzedCount = positions.filter(Boolean).length;
   const progress = fens.length ? analyzedCount / fens.length : 0;
@@ -178,12 +185,13 @@ export function useGameReview() {
   const summary = useMemo(() => {
     if (!analysisComplete || reviews.length !== gameData.timeline.length) return null;
     const lastBook = [...reviews].reverse().find((review) => review.inBook);
+    // Only the user's side is summarised.
     return {
-      accuracy: computeAccuracy(positions.map((position) => position.eval), reviews),
-      counts: countClassifications(reviews),
+      accuracy: computeAccuracy(positions.map((position) => position.eval), reviews)[reviewAs],
+      counts: countClassifications(reviews)[reviewAs],
       opening: lastBook ? book.get(epd(gameData.timeline[lastBook.moveIndex].fenAfterMove)) : null,
     };
-  }, [analysisComplete, book, gameData, positions, reviews]);
+  }, [analysisComplete, book, gameData, positions, reviewAs, reviews]);
 
   const loadPgn = useCallback((pgn, fallbackMetadata = {}) => {
     try {
@@ -192,6 +200,7 @@ export function useGameReview() {
       setPositions([]);
       setGameData(parsed);
       setMetadata(metadataFromHeaders(parsed.headers, fallbackMetadata));
+      setReviewAs(fallbackMetadata.perspective || 'w');
       setCurrentMove(-1);
       setLine(null);
       setRetry(null);
@@ -365,7 +374,12 @@ export function useGameReview() {
     analysisComplete,
     depthPreset,
     setDepthPreset,
+    reviewAs,
+    setReviewAs,
+    // Reviews of the user's moves only (opponent moves are null).
+    myReviews: reviews.map((review, index) => (gameData?.timeline[index]?.color[0].toLowerCase() === reviewAs ? review : null)),
     currentMove,
+    currentIsMine: currentMove >= 0 && gameData?.timeline[currentMove]?.color[0].toLowerCase() === reviewAs,
     currentReview: currentMove >= 0 ? reviews[currentMove] || null : null,
     currentPosition,
     boardFen,

@@ -1,34 +1,103 @@
 import { motion } from 'framer-motion';
-import { BadgeCheck, BrainCircuit, CheckCircle2, Crown, Moon, Sparkles, Sun } from 'lucide-react';
+import { BadgeCheck, BrainCircuit, CheckCircle2, Crown, Moon, Sun } from 'lucide-react';
+import { Chessboard } from 'react-chessboard';
+import { CLASSIFICATIONS } from '../analysis/review';
+import ClassificationBadge from './review/ClassificationBadge';
 import ChessComFetcher from './ChessComFetcher';
 import PgnImporter from './PgnImporter';
 import GameSidebar from './GameSidebar';
 
-const previewSquares = [
-  'r', '', 'b', 'q', 'k', 'b', '', 'r',
-  'p', 'p', '', '', '', 'p', 'p', 'p',
-  '', '', 'n', '', 'p', 'n', '', '',
-  '', '', '', 'p', 'P', '', '', '',
-  '', '', 'B', '', '', '', '', '',
-  '', '', '', '', '', 'N', '', '',
-  'P', 'P', 'P', 'P', '', 'P', 'P', 'P',
-  'R', 'N', 'B', 'Q', 'R', '', 'K', '',
+// Morphy's Opera Game, right after the brilliant 16.Qb8+.
+const PREVIEW_FEN = '1Q2kb1r/p2n1ppp/4q3/4p1B1/4P3/8/PPP2PPP/2KR4 b k - 1 16';
+const PREVIEW_COUNTS = [
+  ['brilliant', 2, 0],
+  ['great', 3, 0],
+  ['best', 9, 6],
+  ['mistake', 0, 1],
+  ['blunder', 0, 1],
 ];
 
-const pieceSymbols = {
-  k: 'K',
-  q: 'Q',
-  r: 'R',
-  b: 'B',
-  n: 'N',
-  p: 'P',
-  K: 'K',
-  Q: 'Q',
-  R: 'R',
-  B: 'B',
-  N: 'N',
-  P: 'P',
-};
+function ReviewPreview() {
+  const boardSize = 288;
+  const square = boardSize / 8;
+
+  return (
+    <div className="relative overflow-hidden rounded-lg border border-cyanGlow/20 bg-[#020b16] p-5">
+      <div className="pointer-events-none absolute -right-20 -top-24 h-52 w-52 rounded-full bg-cyanGlow/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 left-10 h-48 w-48 rounded-full bg-mintGlow/10 blur-3xl" />
+
+      <div className="relative mb-4 flex items-center justify-between text-xs font-bold uppercase tracking-[0.2em] text-cyanGlow/80">
+        <span>Game Review</span>
+        <Crown size={16} />
+      </div>
+
+      <div className="relative flex items-start gap-5">
+        <div className="flex shrink-0 gap-2">
+          <div className="relative w-3 overflow-hidden rounded-sm bg-[#1f2933]" style={{ height: boardSize }}>
+            <div className="absolute inset-x-0 bottom-0 h-[92%] bg-sky-50" />
+          </div>
+          <div className="pointer-events-none relative overflow-hidden rounded-md shadow-glow" style={{ width: boardSize }}>
+            <Chessboard
+              id="LandingPreviewBoard"
+              position={PREVIEW_FEN}
+              boardWidth={boardSize}
+              arePiecesDraggable={false}
+              animationDuration={0}
+              customSquareStyles={{
+                b3: { background: 'rgba(38, 194, 163, 0.45)' },
+                b8: { background: 'rgba(38, 194, 163, 0.6)' },
+              }}
+              customArrows={[['d1', 'd8', 'rgba(129, 182, 76, 0.85)']]}
+              customDarkSquareStyle={{ backgroundColor: '#0b3a52' }}
+              customLightSquareStyle={{ backgroundColor: '#d9f5ff' }}
+            />
+            <span className="absolute" style={{ left: square * 2 - square * 0.32, top: 2 }}>
+              <ClassificationBadge classification="brilliant" size={22} className="ring-2 ring-white/80" />
+            </span>
+          </div>
+        </div>
+
+        <div className="flex w-56 shrink-0 flex-col gap-3">
+          <div className="grid grid-cols-2 gap-2 text-center">
+            <div className="rounded bg-sky-50 py-2">
+              <p className="text-xl font-black text-slate-900">99.1</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Morphy</p>
+            </div>
+            <div className="rounded bg-slate-800 py-2">
+              <p className="text-xl font-black" style={{ color: '#f0f9ff' }}>85.2</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Opponents</p>
+            </div>
+          </div>
+
+          <div className="rounded border border-sky-300/10 bg-slate-950/50 p-3">
+            <div className="mb-1.5 flex items-center gap-2">
+              <ClassificationBadge classification="brilliant" size={20} />
+              <p className="text-sm font-extrabold" style={{ color: CLASSIFICATIONS.brilliant.color }}>
+                Qb8+ is a brilliant move
+              </p>
+            </div>
+            <p className="text-xs leading-relaxed text-sky-100/70">
+              You sacrifice your queen. Black must take it, and Rd8# follows.
+            </p>
+          </div>
+
+          <div className="space-y-1.5 text-xs">
+            {PREVIEW_COUNTS.map(([key, white, black]) => (
+              <div key={key} className="flex items-center gap-2">
+                <ClassificationBadge classification={key} size={16} />
+                <span className="flex-1 font-semibold" style={{ color: CLASSIFICATIONS[key].color }}>
+                  {CLASSIFICATIONS[key].label}
+                </span>
+                <span className="w-5 text-center font-bold text-white">{white}</span>
+                <span className="w-5 text-center font-bold text-sky-100/50">{black}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function LandingPage({
   onImportPgn,
@@ -74,20 +143,20 @@ export default function LandingPage({
           </div>
         </nav>
 
-        <section className="grid items-center gap-10 lg:grid-cols-[1fr_0.92fr]">
+        <section className="grid items-center gap-10 xl:grid-cols-[minmax(0,1fr)_auto]">
           <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}>
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-cyanGlow/25 bg-cyanGlow/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.15em] text-cyanGlow">
               <BadgeCheck size={14} />
-              Powered by Stockfish 16+
+              Powered by Stockfish 18
             </div>
             <h1 className="max-w-3xl text-4xl font-extrabold leading-tight text-white sm:text-5xl lg:text-6xl">
               Welcome to <span className="text-cyanGlow">Chess Analyser</span>
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-sky-100/76">
-              Import your Chess.com games or PGN files and receive grandmaster-grade move-by-move engine analysis.
+              Import your Chess.com games or a PGN and get a full game review: every move rated, your mistakes explained, and the better line shown on the board.
             </p>
             <div className="mt-8 flex flex-wrap gap-4 text-sm text-sky-100/80">
-              {['Deep Engine Analysis', 'Blunder Detection', 'Accuracy Signals'].map((item) => (
+              {['Brilliant & blunder detection', 'Best line and threats', 'Accuracy for both players'].map((item) => (
                 <span key={item} className="flex items-center gap-2">
                   <CheckCircle2 size={16} className="text-cyanGlow" />
                   {item}
@@ -97,97 +166,11 @@ export default function LandingPage({
           </motion.div>
 
           <motion.div
-            className="glass glow-border hidden rounded-lg p-5 lg:block"
+            className="glass glow-border hidden justify-self-center rounded-xl p-3 md:block xl:justify-self-end"
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
           >
-            <div className="relative overflow-hidden rounded border border-cyanGlow/20 bg-[#020b16] p-5">
-              <div className="absolute -right-20 -top-24 h-52 w-52 rounded-full bg-cyanGlow/10 blur-3xl" />
-              <div className="absolute -bottom-24 left-10 h-48 w-48 rounded-full bg-mintGlow/10 blur-3xl" />
-
-              <div className="relative mb-5 flex items-center justify-between text-xs uppercase tracking-[0.22em] text-cyanGlow/80">
-                <span>Live Analysis Board</span>
-                <Crown size={18} />
-              </div>
-
-              <div className="relative grid gap-5 xl:grid-cols-[17rem_1fr]">
-                <div className="aspect-square self-start overflow-hidden rounded-md border border-cyanGlow/25 shadow-glow">
-                  <div className="grid h-full grid-cols-8">
-                    {previewSquares.map((piece, index) => {
-                      const row = Math.floor(index / 8);
-                      const col = index % 8;
-                      const dark = (row + col) % 2 === 1;
-                      const whitePiece = piece && piece === piece.toUpperCase();
-
-                      return (
-                        <span
-                          key={`${piece}-${index}`}
-                          className={`grid place-items-center text-xl font-black ${
-                            dark ? 'bg-[#0b3a52]' : 'bg-[#d9f5ff]'
-                          } ${whitePiece ? 'text-slate-950' : 'text-cyanGlow'}`}
-                        >
-                          {piece ? pieceSymbols[piece] : ''}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="flex flex-col justify-between gap-4">
-                  <div className="rounded border border-sky-300/10 bg-slate-950/45 p-4">
-                    <div className="mb-3 flex items-center gap-2 text-sm font-bold text-white">
-                      <Sparkles size={16} className="text-mintGlow" />
-                      Best move found
-                    </div>
-                    <p className="font-mono text-3xl font-black text-mintGlow">Nf3</p>
-                    <p className="mt-1 text-sm text-sky-100/60">Depth 14 - +0.42</p>
-                  </div>
-
-                  {[88, 68, 42].map((width, index) => (
-                    <div key={index} className="space-y-2">
-                      <div className="flex items-center justify-between text-xs uppercase tracking-[0.16em] text-sky-100/55">
-                        <span>{['Accuracy', 'Pressure', 'Sharpness'][index]}</span>
-                        <span>{width}%</span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-                        <motion.div
-                          className="h-full rounded-full bg-gradient-to-r from-cyanGlow to-mintGlow"
-                          initial={{ width: 0 }}
-                          animate={{ width: `${width}%` }}
-                          transition={{ delay: 0.2 + index * 0.1, duration: 0.7 }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-
-                  <div className="grid grid-cols-6 items-end gap-2">
-                    {Array.from({ length: 18 }).map((_, index) => (
-                      <motion.span
-                        key={index}
-                        className="rounded-t bg-cyanGlow/50"
-                        style={{ height: `${18 + ((index * 23) % 70)}px` }}
-                        initial={{ scaleY: 0 }}
-                        animate={{ scaleY: 1 }}
-                        transition={{ delay: 0.24 + index * 0.025 }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative mt-5 grid grid-cols-3 gap-3 text-center">
-                {[
-                  ['14', 'Depth'],
-                  ['0.18', 'Loss'],
-                  ['Best', 'Class'],
-                ].map(([value, label]) => (
-                  <div key={label} className="rounded border border-sky-300/10 bg-cyanGlow/5 px-3 py-2">
-                    <p className="text-lg font-black text-white">{value}</p>
-                    <p className="text-xs uppercase tracking-[0.14em] text-sky-100/50">{label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ReviewPreview />
           </motion.div>
         </section>
 

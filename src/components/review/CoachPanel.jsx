@@ -52,9 +52,51 @@ function LineChips({ line, onSelect }) {
   );
 }
 
+function OpponentMovePanel({ node, review, opponentName, onShowLine }) {
+  const reply = review?.threatLine;
+  const slipped = review && BAD.has(review.classification);
+  return (
+    <section className="rounded-lg border border-sky-300/10 bg-slate-950/30 p-3">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <p className="text-sm text-sky-100/70">
+          <span className="font-bold text-white">{opponentName}</span> played{' '}
+          <span className="font-bold text-white">
+            {node.moveNumber}
+            {node.color === 'White' ? '.' : '...'} {node.sanMove}
+          </span>
+        </p>
+        {review && <span className="shrink-0 rounded bg-slate-950/60 px-2 py-1 font-mono text-sm font-bold text-white">{formatEval(review.evaluation)}</span>}
+      </div>
+
+      {!review ? (
+        <p className="text-sm text-sky-100/60">Analyzing...</p>
+      ) : reply?.moves.length ? (
+        <>
+          {slipped && <p className="mb-2 text-sm font-semibold text-amber-200">Your opponent slipped here. This is your chance to punish it.</p>}
+          <div className="flex items-center gap-3 rounded border border-mintGlow/30 bg-mintGlow/10 p-3">
+            <ClassificationBadge classification="best" size={22} />
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-mintGlow">Your best reply: {reply.moves[0].san}</p>
+              <p className="truncate font-mono text-xs text-sky-100/60" title={reply.text}>{reply.text}</p>
+            </div>
+          </div>
+          <div className="mt-3">
+            <ActionButton icon={Lightbulb} onClick={() => onShowLine('threat')} primary={slipped}>Show best reply</ActionButton>
+          </div>
+        </>
+      ) : (
+        <p className="text-sm text-sky-100/60">The game ended here.</p>
+      )}
+    </section>
+  );
+}
+
 export default function CoachPanel({
   node,
   review,
+  isMine = true,
+  reviewAs = 'w',
+  opponentName = 'Opponent',
   currentPosition,
   line,
   retry,
@@ -100,7 +142,9 @@ export default function CoachPanel({
     return (
       <section className="rounded-lg border border-sky-300/10 bg-slate-950/30 p-3">
         <div className="mb-3 flex items-center justify-between gap-2">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyanGlow">{LINE_TITLES[line.kind]}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyanGlow">
+            {line.kind === 'threat' && line.startFen.split(' ')[1] === reviewAs ? 'Your best reply' : LINE_TITLES[line.kind]}
+          </p>
           <span className="rounded bg-slate-950/60 px-2 py-1 font-mono text-sm font-bold text-white">
             {currentPosition ? formatEval(currentPosition.eval) : engineReady ? '...' : '--'}
           </span>
@@ -127,6 +171,10 @@ export default function CoachPanel({
         <p className="mt-1 text-sm text-sky-100/60">Press → or click a move to walk through the review.</p>
       </section>
     );
+  }
+
+  if (!isMine) {
+    return <OpponentMovePanel node={node} review={review} opponentName={opponentName} onShowLine={onShowLine} />;
   }
 
   if (!review) {

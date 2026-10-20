@@ -58,5 +58,7 @@ export function metadataFromHeaders(headers = {}, fallback = {}) {
     date: headers.Date || fallback.date || '',
     opening: headers.ECOUrl ? headers.ECOUrl.split('/').pop()?.replaceAll('-', ' ') : fallback.opening || 'Unknown opening',
     timeControl: headers.TimeControl || fallback.timeControl || 'Unknown',
+    // Which side the fetched Chess.com user played ('w' / 'b'), used to orient the board.
+    perspective: fallback.perspective || null,
   };
 }

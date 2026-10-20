@@ -3,14 +3,16 @@ import { ChevronDown } from 'lucide-react';
 import { CLASSIFICATIONS, SUMMARY_ORDER } from '../../analysis/review';
 import ClassificationBadge from './ClassificationBadge';
 
-export default function ReviewSummary({ summary, metadata, progress, analysisComplete }) {
+/** Accuracy and move breakdown for the user's side only. */
+export default function ReviewSummary({ summary, metadata, reviewAs, progress, analysisComplete }) {
   const [expanded, setExpanded] = useState(false);
+  const myName = reviewAs === 'w' ? metadata?.white : metadata?.black;
 
   if (!analysisComplete || !summary) {
     return (
       <div>
         <div className="flex items-center justify-between text-xs">
-          <span className="font-bold uppercase tracking-[0.16em] text-cyanGlow">Reviewing game...</span>
+          <span className="font-bold uppercase tracking-[0.16em] text-cyanGlow">Reviewing your moves...</span>
           <span className="text-sky-100/60">{Math.round(progress * 100)}%</span>
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-950">
@@ -21,29 +23,39 @@ export default function ReviewSummary({ summary, metadata, progress, analysisCom
   }
 
   const { accuracy, counts } = summary;
+  const mistakes = (counts.inaccuracy || 0) + (counts.mistake || 0) + (counts.miss || 0) + (counts.blunder || 0);
+
   return (
     <div>
-      <div className="grid grid-cols-[1fr_4.5rem_4.5rem] items-center gap-x-2 gap-y-1 text-sm">
-        <span className="text-xs font-bold uppercase tracking-[0.16em] text-cyanGlow">Accuracy</span>
-        <span className="truncate text-center text-xs text-sky-100/60" title={metadata?.white}>{metadata?.white}</span>
-        <span className="truncate text-center text-xs text-sky-100/60" title={metadata?.black}>{metadata?.black}</span>
+      <div className="flex items-center gap-3">
+        <div
+          className={`rounded px-3 py-1.5 text-center ${reviewAs === 'w' ? 'bg-sky-50' : 'bg-slate-800'}`}
+          style={{ color: reviewAs === 'w' ? '#0f172a' : '#f0f9ff' }}
+        >
+          <p className="text-2xl font-black leading-none">{accuracy?.toFixed(1) ?? '--'}</p>
+          <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.14em] opacity-60">Accuracy</p>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold text-white" title={myName}>{myName}</p>
+          <p className="text-xs text-sky-100/60">
+            {mistakes ? `${mistakes} move${mistakes === 1 ? '' : 's'} to improve` : 'No mistakes - clean game!'}
+            {counts.brilliant ? ` · ${counts.brilliant} brilliant` : ''}
+          </p>
+        </div>
+      </div>
 
-        <span />
-        <span className="rounded bg-sky-50 py-1 text-center text-lg font-black text-slate-900">{accuracy.w?.toFixed(1) ?? '--'}</span>
-        <span className="rounded bg-slate-800 py-1 text-center text-lg font-black" style={{ color: '#f0f9ff' }}>{accuracy.b?.toFixed(1) ?? '--'}</span>
-
-        {expanded &&
-          SUMMARY_ORDER.map((key) => (
-            <div key={key} className="contents">
-              <span className="flex items-center gap-2" style={{ color: CLASSIFICATIONS[key].color }}>
-                <ClassificationBadge classification={key} size={16} />
-                <span className="font-semibold">{CLASSIFICATIONS[key].label}</span>
-              </span>
-              <span className="text-center font-bold" style={{ color: CLASSIFICATIONS[key].color }}>{counts.w[key] || 0}</span>
-              <span className="text-center font-bold" style={{ color: CLASSIFICATIONS[key].color }}>{counts.b[key] || 0}</span>
+      {expanded && (
+        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+          {SUMMARY_ORDER.map((key) => (
+            <div key={key} className="flex items-center gap-2" style={{ color: CLASSIFICATIONS[key].color }}>
+              <ClassificationBadge classification={key} size={16} />
+              <span className="flex-1 font-semibold">{CLASSIFICATIONS[key].label}</span>
+              <span className="font-bold">{counts[key] || 0}</span>
             </div>
           ))}
-      </div>
+        </div>
+      )}
+
       <div className="mt-2 flex items-center justify-between gap-2">
         <p className="min-w-0 truncate text-xs capitalize text-sky-100/55" title={summary.opening || metadata?.opening}>
           {summary.opening || metadata?.opening}

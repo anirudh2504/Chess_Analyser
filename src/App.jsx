@@ -23,6 +23,7 @@ export default function App() {
       date: game.date,
       timeControl: game.timeControl,
       event: 'Chess.com Game',
+      perspective: game.perspective,
     });
   }
 

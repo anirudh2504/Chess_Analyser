@@ -93,7 +93,13 @@ export function reviewMove({ node, before, after, previous, book, inBook }) {
     const isRecapture = previous?.move?.captured && previous.move.to === move.to && move.captured;
 
     const isMate = node.sanMove.includes('#');
-    if (sacrifice && winPlayed >= 0.5 && !isMate) classification = 'brilliant';
+    // Brilliant: the engine's own top move, a genuine piece sacrifice (not a king move leaving
+    // something behind), and the position was not already completely won - unless the sacrifice
+    // itself forces mate (e.g. Morphy's 16.Qb8+).
+    const forcesMate = mateFor(mover, after.eval);
+    const brilliant =
+      sacrifice && isBestMove && move.piece !== 'k' && winPlayed >= 0.5 && (winBest <= 0.95 || forcesMate) && !isMate;
+    if (brilliant) classification = 'brilliant';
     else if (isBestMove && !isMate && !isRecapture && (onlyMoveGap >= 0.15 || (previousErred && onlyMoveGap >= 0.08))) classification = 'great';
     else if (isBestMove || loss <= 0.005) classification = 'best';
     else classification = 'excellent';
